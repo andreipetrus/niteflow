@@ -5,19 +5,25 @@ import { piholeQueries } from '@/lib/db/schema'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import { and, eq } from 'drizzle-orm'
 
+// Pi-hole v6 returns id/status/type as numbers, time as a float Unix timestamp
 const PiholeQuerySchema = z.object({
-  id: z.string(),
+  id: z.union([z.string(), z.number()]),
   time: z.number(),
   domain: z.string(),
-  client: z.object({ ip: z.string() }),
-  status: z.string(),
-  type: z.string().optional(),
+  client: z.object({
+    ip: z.string(),
+    name: z.string().optional(),
+  }),
+  // status is an integer code in v6 (2=forwarded, 3=cached, 1=blocked-gravity, etc.)
+  status: z.union([z.string(), z.number()]).transform(String),
+  type: z.union([z.string(), z.number()]).optional(),
 })
 
 const PiholeQueriesResponseSchema = z.object({
   queries: z.array(PiholeQuerySchema),
-  recordsTotal: z.number(),
-  recordsFiltered: z.number(),
+  recordsTotal: z.number().optional(),
+  recordsFiltered: z.number().optional(),
+  // cursor is a number when more pages exist, absent or null when done
   cursor: z.number().nullable().optional(),
 })
 
@@ -49,18 +55,25 @@ export async function syncQueries(
     if (cursor != null) params.cursor = cursor
 
     const raw = await piholeGet<unknown>(config, '/api/queries', params)
-    const parsed = PiholeQueriesResponseSchema.parse(raw)
+    const parsed = PiholeQueriesResponseSchema.safeParse(raw)
 
-    const filtered = parsed.queries.filter((q) => selectedIps.includes(q.client.ip))
+    if (!parsed.success) {
+      console.error('[pihole] syncQueries: unexpected response shape', parsed.error.issues)
+      throw new Error(`Pi-hole query response did not match expected format: ${parsed.error.issues[0]?.message}`)
+    }
+
+    const filtered = parsed.data.queries.filter((q) => selectedIps.includes(q.client.ip))
 
     for (const q of filtered) {
-      // Check for existing record with same timestamp + domain + client
+      // Use floor so float timestamps (Pi-hole v6 includes ms) match on re-sync
+      const ts = Math.floor(q.time)
+
       const existing = db
         .select({ id: piholeQueries.id })
         .from(piholeQueries)
         .where(
           and(
-            eq(piholeQueries.timestamp, q.time),
+            eq(piholeQueries.timestamp, ts),
             eq(piholeQueries.domain, q.domain),
             eq(piholeQueries.clientIp, q.client.ip)
           )
@@ -72,7 +85,7 @@ export async function syncQueries(
       } else {
         db.insert(piholeQueries)
           .values({
-            timestamp: q.time,
+            timestamp: ts,
             domain: q.domain,
             clientIp: q.client.ip,
             status: q.status,
@@ -83,7 +96,7 @@ export async function syncQueries(
       }
     }
 
-    cursor = parsed.cursor
+    cursor = parsed.data.cursor
   } while (cursor != null)
 
   return { inserted, skipped, dateRange: { from, to } }
