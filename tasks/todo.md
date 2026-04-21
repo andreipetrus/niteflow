@@ -3,7 +3,7 @@
 ## Phase A · Foundation & Pi-hole Integration
 
 - [x] **T01** · Project scaffolding, Drizzle schema, app shell
-- [ ] **T02** · Settings page + Pi-hole v6 auth (session token)
+- [x] **T02** · Settings page + Pi-hole v6 auth (session token)
 - [ ] **T03** · Device selection + Pi-hole query sync
 
 > **CHECKPOINT A** — Pi-hole syncing real queries into local DB
