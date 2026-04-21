@@ -4,7 +4,7 @@
 
 - [x] **T01** · Project scaffolding, Drizzle schema, app shell
 - [x] **T02** · Settings page + Pi-hole v6 auth (session token)
-- [ ] **T03** · Device selection + Pi-hole query sync
+- [x] **T03** · Device selection + Pi-hole query sync
 
 > **CHECKPOINT A** — Pi-hole syncing real queries into local DB
 
