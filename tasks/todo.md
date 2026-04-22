@@ -17,21 +17,21 @@
 
 ## Phase C · Analytics
 
-- [ ] **T07** · Pre-sleep window aggregation (category totals per night)
-- [ ] **T08** · Correlation engine (Pearson r, minimum-data guard)
+- [x] **T07** · Pre-sleep window aggregation (category totals per night)
+- [x] **T08** · Correlation engine (Pearson r, minimum-data guard)
 
-> **CHECKPOINT C** — Correlations computing correctly on real data
+> **CHECKPOINT C** ✅ — Correlations computing correctly on real data
 
 ## Phase D · Dashboard & Recommendations
 
-- [ ] **T09** · Dashboard — Sleep timeline chart
-- [ ] **T10** · Dashboard — Pre-sleep activity stacked bar
-- [ ] **T11** · Correlations page — Heatmap + scatter drill-down
-- [ ] **T12** · Recommendations panel with blocklist suggestions
+- [x] **T09** · Dashboard — Sleep timeline chart
+- [x] **T10** · Dashboard — Pre-sleep activity stacked bar
+- [x] **T11** · Correlations page — Heatmap + scatter drill-down
+- [x] **T12** · Recommendations panel with blocklist suggestions
 
-> **CHECKPOINT D** — Full dashboard working end-to-end
+> **CHECKPOINT D** ✅ — Full dashboard working end-to-end
 
 ## Phase E · Polish
 
 - [ ] **T13** · User domain override UI
-- [ ] **T14** · Pi-hole list name inference for categorization
+- [ ] ~~**T14**~~ · Pi-hole list name inference — superseded by Curlie (T04+T05)
