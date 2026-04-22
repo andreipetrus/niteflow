@@ -15,6 +15,13 @@
       "when": 1776865193523,
       "tag": "0001_parallel_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776872736665,
+      "tag": "0002_far_meggan",
+      "breakpoints": true
     }
   ]
 }

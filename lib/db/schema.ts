@@ -20,7 +20,10 @@ export const sleepRecords = sqliteTable('sleep_records', {
   type: text('type').notNull(),
   startTs: integer('start_ts').notNull(), // Unix seconds
   endTs: integer('end_ts').notNull(),
-  value: real('value'),
+  // Value is a string — Apple uses enums for sleep stages
+  // (HKCategoryValueSleepAnalysisAsleepCore) and numeric strings for quantity
+  // types (HRV "45.2", heart rate "62"). Callers parse as needed.
+  value: text('value'),
   unit: text('unit'),
   source: text('source'),
 })
