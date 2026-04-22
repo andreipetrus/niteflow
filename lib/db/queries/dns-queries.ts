@@ -5,6 +5,7 @@ import { sql, inArray, and, not, like, type SQL } from 'drizzle-orm'
 export type DomainCount = {
   domain: string
   total: number
+  category: string | null
   byDevice: Record<string, number>
 }
 
@@ -32,6 +33,7 @@ export function getTopDomainsByDevice(
     .select({
       domain: piholeQueries.domain,
       total: sql<number>`count(*)`.as('total'),
+      category: sql<string | null>`max(category)`.as('category'),
     })
     .from(piholeQueries)
     .where(whereClause)
@@ -70,6 +72,7 @@ export function getTopDomainsByDevice(
   return totals.map((t) => ({
     domain: t.domain,
     total: Number(t.total),
+    category: t.category ?? null,
     byDevice: byDomain.get(t.domain) ?? {},
   }))
 }

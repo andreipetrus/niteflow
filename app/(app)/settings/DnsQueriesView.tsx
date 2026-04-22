@@ -126,6 +126,7 @@ export function DnsQueriesView({ availableDevices }: Props) {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="text-left px-3 py-2 font-medium">Domain</th>
+                  <th className="text-left px-3 py-2 font-medium w-44">Content Type</th>
                   <th className="text-right px-3 py-2 font-medium w-20">Total</th>
                   {selectedIps.map((ip) => {
                     const device = availableDevices.find((d) => d.ip === ip)
@@ -142,6 +143,15 @@ export function DnsQueriesView({ availableDevices }: Props) {
                   <tr key={row.domain} className="border-t">
                     <td className="px-3 py-1.5 font-mono text-xs truncate max-w-md">
                       {row.domain}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      {row.category ? (
+                        <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs">
+                          {row.category}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{row.total}</td>
                     {selectedIps.map((ip) => (
