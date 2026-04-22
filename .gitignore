@@ -42,3 +42,6 @@ next-env.d.ts
 niteflow.db
 niteflow.db-shm
 niteflow.db-wal
+
+# Raw Curlie dump — rebuild with scripts/build-curlie-taxonomy.ts
+data/curlie/

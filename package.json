@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "build:taxonomy": "tsx scripts/build-taxonomy.ts"
+    "build:taxonomy": "tsx scripts/build-curlie-taxonomy.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

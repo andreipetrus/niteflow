@@ -1,151 +1,134 @@
 'use server'
 
-import { TAXONOMY_SOURCES } from '@/data/taxonomy-sources'
-import type { TaxonomySource } from '@/data/taxonomy-sources'
-import { fetchTaxonomySource } from '@/lib/taxonomy/loader'
+import { loadCurlieTaxonomy, taxonomySize } from '@/lib/taxonomy/curlie'
+import { categorizeDomain } from '@/lib/taxonomy/categorize'
+import { IAB_CATEGORIES } from '@/data/iab-categories'
+import type { IabCategory } from '@/data/iab-categories'
 import { db } from '@/lib/db/client'
 import { domainCategories, piholeQueries } from '@/lib/db/schema'
 import { getSetting, setSetting } from '@/lib/db/queries/settings'
-import { eq, and, isNotNull, sql } from 'drizzle-orm'
+import { eq, isNotNull, sql } from 'drizzle-orm'
 
-export type TaxonomyState = {
-  source: TaxonomySource
-  enabled: boolean
-  lastLoadedAt: number | null
+export type TaxonomyStatus = {
+  loaded: boolean
   domainCount: number
+  loadedAt: number | null
+  categoriesInDb: number
+  categorizedQueries: number
+  iabCategories: IabCategory[]
 }
 
-function getEnabledIds(): Set<string> {
-  const raw = getSetting('taxonomy_enabled')
-  if (!raw) return new Set()
-  try {
-    return new Set(JSON.parse(raw) as string[])
-  } catch {
-    return new Set()
-  }
-}
+export async function getTaxonomyStatus(): Promise<TaxonomyStatus> {
+  const loadedAt = getSetting('curlie_loaded_at')
+  const domainCountStr = getSetting('curlie_domain_count')
 
-function setEnabledIds(ids: Set<string>) {
-  setSetting('taxonomy_enabled', JSON.stringify([...ids]))
-}
+  const categoriesInDb = db
+    .select({ c: sql<number>`count(*)` })
+    .from(domainCategories)
+    .get()
 
-function getLoadedMeta(): Record<string, { at: number; count: number }> {
-  const raw = getSetting('taxonomy_loaded')
-  if (!raw) return {}
-  try {
-    return JSON.parse(raw) as Record<string, { at: number; count: number }>
-  } catch {
-    return {}
-  }
-}
-
-function setLoadedMeta(meta: Record<string, { at: number; count: number }>) {
-  setSetting('taxonomy_loaded', JSON.stringify(meta))
-}
-
-export async function getTaxonomyState(): Promise<TaxonomyState[]> {
-  const enabledIds = getEnabledIds()
-  const loadedMeta = getLoadedMeta()
-
-  return TAXONOMY_SOURCES.map((source) => ({
-    source,
-    enabled: enabledIds.has(source.id),
-    lastLoadedAt: loadedMeta[source.id]?.at ?? null,
-    domainCount: loadedMeta[source.id]?.count ?? 0,
-  }))
-}
-
-export async function toggleTaxonomy(id: string, enabled: boolean): Promise<void> {
-  const ids = getEnabledIds()
-  if (enabled) ids.add(id)
-  else ids.delete(id)
-  setEnabledIds(ids)
-}
-
-export type ApplyResult = {
-  ok: boolean
-  summary: { sourceId: string; name: string; domainCount: number; error?: string }[]
-  queriesRecategorized: number
-}
-
-export async function applyTaxonomies(): Promise<ApplyResult> {
-  const enabledIds = getEnabledIds()
-  const enabledSources = TAXONOMY_SOURCES.filter((s) => enabledIds.has(s.id))
-  const now = Math.floor(Date.now() / 1000)
-
-  const summary: ApplyResult['summary'] = []
-  const loadedMeta = getLoadedMeta()
-
-  for (const source of enabledSources) {
-    try {
-      const domains = await fetchTaxonomySource(source)
-
-      // Upsert per domain. Never overwrite user-assigned categories.
-      db.transaction((tx) => {
-        for (const domain of domains) {
-          const existing = tx
-            .select({ source: domainCategories.source })
-            .from(domainCategories)
-            .where(eq(domainCategories.domain, domain))
-            .get()
-
-          if (existing?.source === 'user') continue
-
-          tx.insert(domainCategories)
-            .values({
-              domain,
-              category: source.category,
-              source: `taxonomy:${source.id}`,
-              updatedAt: now,
-            })
-            .onConflictDoUpdate({
-              target: domainCategories.domain,
-              set: {
-                category: source.category,
-                source: `taxonomy:${source.id}`,
-                updatedAt: now,
-              },
-            })
-            .run()
-        }
-      })
-
-      loadedMeta[source.id] = { at: now, count: domains.length }
-      summary.push({ sourceId: source.id, name: source.name, domainCount: domains.length })
-    } catch (err) {
-      summary.push({
-        sourceId: source.id,
-        name: source.name,
-        domainCount: 0,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-
-  setLoadedMeta(loadedMeta)
-
-  // Re-categorize existing Pi-hole queries based on the refreshed taxonomy.
-  const updateResult = db.run(sql`
-    UPDATE pihole_queries
-    SET category = (
-      SELECT category FROM domain_categories WHERE domain_categories.domain = pihole_queries.domain
-    )
-    WHERE EXISTS (
-      SELECT 1 FROM domain_categories WHERE domain_categories.domain = pihole_queries.domain
-    )
-  `)
-  void updateResult
-
-  // Count how many queries now have a category set
-  const totalCategorized = db
+  const categorizedQueries = db
     .select({ c: sql<number>`count(*)` })
     .from(piholeQueries)
-    .where(and(isNotNull(piholeQueries.category)))
+    .where(isNotNull(piholeQueries.category))
+    .get()
+
+  return {
+    loaded: Boolean(loadedAt),
+    domainCount: domainCountStr ? Number(domainCountStr) : 0,
+    loadedAt: loadedAt ? Number(loadedAt) : null,
+    categoriesInDb: Number(categoriesInDb?.c ?? 0),
+    categorizedQueries: Number(categorizedQueries?.c ?? 0),
+    iabCategories: IAB_CATEGORIES.filter((c) => c.id !== 'other'),
+  }
+}
+
+export type ApplyTaxonomyResult =
+  | { ok: true; domainsLoaded: number; queriesCategorized: number; elapsedMs: number }
+  | { ok: false; error: string }
+
+export async function applyCurlieTaxonomy(): Promise<ApplyTaxonomyResult> {
+  const started = Date.now()
+
+  let taxonomy: Record<string, string>
+  try {
+    taxonomy = loadCurlieTaxonomy()
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+
+  const entries = Object.entries(taxonomy)
+  const now = Math.floor(Date.now() / 1000)
+  const source = 'curlie'
+
+  // Single transaction → 500K upserts is seconds rather than minutes.
+  // User-assigned categories (source='user') are preserved.
+  db.transaction((tx) => {
+    // Wipe previous curlie rows (so a reload with updated data replaces cleanly)
+    tx.delete(domainCategories).where(eq(domainCategories.source, source)).run()
+
+    for (const [domain, category] of entries) {
+      // Don't clobber user overrides that may have landed under the same domain
+      const existing = tx
+        .select({ source: domainCategories.source })
+        .from(domainCategories)
+        .where(eq(domainCategories.domain, domain))
+        .get()
+
+      if (existing?.source === 'user') continue
+
+      tx.insert(domainCategories)
+        .values({ domain, category, source, updatedAt: now })
+        .onConflictDoUpdate({
+          target: domainCategories.domain,
+          set: { category, source, updatedAt: now },
+        })
+        .run()
+    }
+  })
+
+  // Re-categorize existing pihole_queries using the progressive-subdomain
+  // fallback in categorizeDomain. We compute categories per unique domain,
+  // then bulk-update pihole_queries by domain.
+  const distinctDomains = db
+    .selectDistinct({ domain: piholeQueries.domain })
+    .from(piholeQueries)
+    .all()
+
+  db.transaction((tx) => {
+    for (const { domain } of distinctDomains) {
+      const category = categorizeDomain(domain, taxonomy)
+      if (category) {
+        tx.run(
+          sql`UPDATE pihole_queries SET category = ${category} WHERE domain = ${domain}`
+        )
+      }
+    }
+  })
+
+  setSetting('curlie_loaded_at', String(now))
+  setSetting('curlie_domain_count', String(entries.length))
+
+  const queriesCategorized = db
+    .select({ c: sql<number>`count(*)` })
+    .from(piholeQueries)
+    .where(isNotNull(piholeQueries.category))
     .get()
 
   return {
     ok: true,
-    summary,
-    queriesRecategorized: Number(totalCategorized?.c ?? 0),
+    domainsLoaded: entries.length,
+    queriesCategorized: Number(queriesCategorized?.c ?? 0),
+    elapsedMs: Date.now() - started,
   }
+}
+
+export type PackAvailability = {
+  available: boolean
+  domainCount: number
+}
+
+export async function checkTaxonomyPack(): Promise<PackAvailability> {
+  const size = taxonomySize()
+  return { available: size > 0, domainCount: size }
 }
