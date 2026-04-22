@@ -61,11 +61,32 @@ describe('database schema', () => {
 
   it('pihole_queries table stores DNS query records', () => {
     db.insert(piholeQueries)
-      .values({ timestamp: 1705276800, domain: 'youtube.com', clientIp: '192.168.1.10', status: 'OK', category: null })
+      .values({
+        piholeId: 12345,
+        timestamp: 1705276800,
+        domain: 'youtube.com',
+        clientIp: '192.168.1.10',
+        status: 'OK',
+        category: null,
+      })
       .run()
     const rows = db.select().from(piholeQueries).all()
     expect(rows[0].domain).toBe('youtube.com')
     expect(rows[0].category).toBeNull()
+    expect(rows[0].piholeId).toBe(12345)
+  })
+
+  it('pihole_queries rejects duplicate pihole_id', () => {
+    const row = {
+      piholeId: 99,
+      timestamp: 1705276800,
+      domain: 'foo.com',
+      clientIp: '192.168.1.10',
+      status: 'OK',
+      category: null,
+    }
+    db.insert(piholeQueries).values(row).run()
+    expect(() => db.insert(piholeQueries).values(row).run()).toThrow()
   })
 
   it('domain_categories table stores domain→category mappings with source', () => {

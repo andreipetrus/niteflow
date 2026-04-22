@@ -27,6 +27,7 @@ export const sleepRecords = sqliteTable('sleep_records', {
 
 export const piholeQueries = sqliteTable('pihole_queries', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  piholeId: integer('pihole_id').notNull().unique(),
   timestamp: integer('timestamp').notNull(), // Unix seconds
   domain: text('domain').notNull(),
   clientIp: text('client_ip').notNull(),

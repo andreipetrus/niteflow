@@ -43,61 +43,75 @@ export async function syncQueries(
 ): Promise<SyncResult> {
   let inserted = 0
   let skipped = 0
-  let cursor: number | null | undefined = undefined
-  const PAGE_SIZE = 500
+  const PAGE_SIZE = 1000
 
-  do {
-    const params: Record<string, string | number> = {
-      from,
-      until: to,
-      length: PAGE_SIZE,
-    }
-    if (cursor != null) params.cursor = cursor
+  // Fetch per-client with server-side filtering via client_ip.
+  // Pi-hole v6 uses offset-based pagination (start + length), NOT cursor.
+  for (const clientIp of selectedIps) {
+    let start = 0
+    let pageCount = 0
 
-    const raw = await piholeGet<unknown>(config, '/api/queries', params)
-    const parsed = PiholeQueriesResponseSchema.safeParse(raw)
+    while (true) {
+      const params: Record<string, string | number> = {
+        from,
+        until: to,
+        length: PAGE_SIZE,
+        start,
+        client_ip: clientIp,
+      }
 
-    if (!parsed.success) {
-      console.error('[pihole] syncQueries: unexpected response shape', parsed.error.issues)
-      throw new Error(`Pi-hole query response did not match expected format: ${parsed.error.issues[0]?.message}`)
-    }
+      const raw = await piholeGet<unknown>(config, '/api/queries', params)
+      const parsed = PiholeQueriesResponseSchema.safeParse(raw)
 
-    const filtered = parsed.data.queries.filter((q) => selectedIps.includes(q.client.ip))
-
-    for (const q of filtered) {
-      // Use floor so float timestamps (Pi-hole v6 includes ms) match on re-sync
-      const ts = Math.floor(q.time)
-
-      const existing = db
-        .select({ id: piholeQueries.id })
-        .from(piholeQueries)
-        .where(
-          and(
-            eq(piholeQueries.timestamp, ts),
-            eq(piholeQueries.domain, q.domain),
-            eq(piholeQueries.clientIp, q.client.ip)
-          )
+      if (!parsed.success) {
+        console.error('[pihole] syncQueries: unexpected response shape', parsed.error.issues)
+        throw new Error(
+          `Pi-hole query response did not match expected format: ${parsed.error.issues[0]?.message}`
         )
-        .get()
+      }
 
-      if (existing) {
-        skipped++
-      } else {
-        db.insert(piholeQueries)
-          .values({
-            timestamp: ts,
-            domain: q.domain,
-            clientIp: q.client.ip,
-            status: q.status,
-            category: null,
-          })
-          .run()
-        inserted++
+      // Safety net: re-filter locally in case the server ignores client_ip
+      const queries = parsed.data.queries.filter((q) => q.client.ip === clientIp)
+
+      if (parsed.data.queries.length === 0) break
+
+      for (const q of queries) {
+        const ts = Math.floor(q.time)
+        const piholeIdNum = typeof q.id === 'number' ? q.id : parseInt(String(q.id), 10)
+
+        const existing = db
+          .select({ id: piholeQueries.id })
+          .from(piholeQueries)
+          .where(eq(piholeQueries.piholeId, piholeIdNum))
+          .get()
+
+        if (existing) {
+          skipped++
+        } else {
+          db.insert(piholeQueries)
+            .values({
+              piholeId: piholeIdNum,
+              timestamp: ts,
+              domain: q.domain,
+              clientIp: q.client.ip,
+              status: q.status,
+              category: null,
+            })
+            .run()
+          inserted++
+        }
+      }
+
+      // Stop when the server returned fewer than requested → last page
+      if (parsed.data.queries.length < PAGE_SIZE) break
+
+      start += PAGE_SIZE
+      pageCount++
+      if (pageCount > 1000) {
+        throw new Error('Sync aborted: exceeded 1000 pages for a single client')
       }
     }
-
-    cursor = parsed.data.cursor
-  } while (cursor != null)
+  }
 
   return { inserted, skipped, dateRange: { from, to } }
 }
