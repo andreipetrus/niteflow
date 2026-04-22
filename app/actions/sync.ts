@@ -15,9 +15,21 @@ export async function loadDevices(): Promise<DevicesResult> {
 
   try {
     const devices = await fetchDevices(config)
+    // Cache so other UI (e.g. DNS queries view) can show names without hitting the API
+    setSetting('pihole_device_cache', JSON.stringify(devices))
     return { ok: true, devices }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function getCachedDevices(): { ip: string; name: string }[] {
+  const raw = getSetting('pihole_device_cache')
+  if (!raw) return []
+  try {
+    return JSON.parse(raw) as { ip: string; name: string }[]
+  } catch {
+    return []
   }
 }
 
@@ -33,6 +45,17 @@ export async function getSelectedDeviceIps(): Promise<string[]> {
   } catch {
     return []
   }
+}
+
+// Returns selected device IPs paired with display names, using the cached
+// device list populated by loadDevices. Falls back to IP-as-name.
+export async function getSelectedDevices(): Promise<{ ip: string; name: string }[]> {
+  const ips = await getSelectedDeviceIps()
+  if (ips.length === 0) return []
+
+  const cached = getCachedDevices()
+  const byIp = new Map(cached.map((d) => [d.ip, d.name]))
+  return ips.map((ip) => ({ ip, name: byIp.get(ip) ?? ip }))
 }
 
 export type SyncActionResult =

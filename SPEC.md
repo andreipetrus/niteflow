@@ -33,6 +33,12 @@ Niteflow is a **local-first web application** for tech-savvy consumers who run P
 - Device selection: fetch device/client list from Pi-hole, user picks IPs to monitor (e.g. phone + laptop)
 - Pre-sleep window: configurable look-back hours before detected sleep start (default: 3 hours)
 - Minimum data threshold for correlation display: configurable nights (default: 7)
+- **DNS Queries Inspector**: multi-select devices, view top queried domains grouped by device,
+  with noise filtering (mDNS broadcasts, reverse DNS, service discovery excluded)
+- **Content Taxonomies**: user-selectable open-source taxonomies for categorization
+  (Steven Black category lists, Hagezi per-service lists). Toggle on/off per source; "Apply"
+  fetches and populates the `domain_categories` table. Category names follow IAB Content
+  Taxonomy conventions where applicable
 
 ### 3.2 Apple Health Import
 
