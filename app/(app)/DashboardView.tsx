@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { fetchSleepTimeline } from '@/app/actions/dashboard'
+import { fetchSleepTimeline, fetchPreSleepActivity } from '@/app/actions/dashboard'
 import type { SleepTimelinePoint } from '@/lib/db/queries/sleep'
+import type { NightlyAggregate } from '@/lib/analytics/aggregate'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { SleepTimeline } from '@/components/charts/SleepTimeline'
+import { PreSleepActivity } from '@/components/charts/PreSleepActivity'
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -19,18 +21,28 @@ function daysAgo(n: number): string {
   return isoDate(d)
 }
 
-type Props = { initialData: SleepTimelinePoint[]; initialFrom: string; initialTo: string }
+type Props = {
+  initialData: SleepTimelinePoint[]
+  initialActivity: NightlyAggregate[]
+  initialFrom: string
+  initialTo: string
+}
 
-export function DashboardView({ initialData, initialFrom, initialTo }: Props) {
+export function DashboardView({ initialData, initialActivity, initialFrom, initialTo }: Props) {
   const [from, setFrom] = useState(initialFrom)
   const [to, setTo] = useState(initialTo)
   const [data, setData] = useState(initialData)
+  const [activity, setActivity] = useState(initialActivity)
   const [isLoading, startLoading] = useTransition()
 
   function refresh(f: string, t: string) {
     startLoading(async () => {
-      const next = await fetchSleepTimeline(f, t)
-      setData(next)
+      const [timeline, act] = await Promise.all([
+        fetchSleepTimeline(f, t),
+        fetchPreSleepActivity(f, t, 3),
+      ])
+      setData(timeline)
+      setActivity(act)
     })
   }
 
@@ -103,6 +115,18 @@ export function DashboardView({ initialData, initialFrom, initialTo }: Props) {
               <Stat label="Avg HRV" value={stats.avgHrv != null ? `${stats.avgHrv.toFixed(1)}ms` : '—'} />
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pre-Sleep Activity</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            DNS queries in the 3-hour window before sleep, broken down by content category.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <PreSleepActivity data={activity} />
         </CardContent>
       </Card>
     </div>
