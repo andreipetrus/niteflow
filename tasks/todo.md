@@ -10,9 +10,8 @@
 
 ## Phase B · Data Ingestion
 
-- [ ] **T04** · Domain taxonomy data file (build script + committed output)
-- [ ] **T05** · Domain categorization engine + batch categorize synced queries
-- [ ] **T06** · Apple Health import (ZIP upload, XML parser, sleep scoring)
+- [x] **T04 + T05** · Replaced with IAB Taxonomy v3 + Curlie pipeline (514K domains, 37.8% query coverage with subdomain fallback)
+- [x] **T06** · Apple Health import (ZIP upload, XML parser, sleep scoring)
 
 > **CHECKPOINT B** — Both sources populated; ≥7 nights of sleep + queries overlap
 

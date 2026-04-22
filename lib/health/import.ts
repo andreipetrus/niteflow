@@ -80,6 +80,8 @@ export async function importHealthXml(xmlStream: Readable): Promise<ImportSummar
       tx.insert(sleepSessions)
         .values({
           date: s.date,
+          sleepStartTs: s.sleepStartTs,
+          sleepEndTs: s.sleepEndTs,
           qualityScore: s.qualityScore,
           totalMin: s.totalMin,
           deepPct: s.deepPct,
@@ -90,6 +92,8 @@ export async function importHealthXml(xmlStream: Readable): Promise<ImportSummar
         .onConflictDoUpdate({
           target: sleepSessions.date,
           set: {
+            sleepStartTs: s.sleepStartTs,
+            sleepEndTs: s.sleepEndTs,
             qualityScore: s.qualityScore,
             totalMin: s.totalMin,
             deepPct: s.deepPct,

@@ -6,7 +6,9 @@ export const settings = sqliteTable('settings', {
 })
 
 export const sleepSessions = sqliteTable('sleep_sessions', {
-  date: text('date').primaryKey(), // YYYY-MM-DD
+  date: text('date').primaryKey(), // YYYY-MM-DD (wake-date per SPEC)
+  sleepStartTs: integer('sleep_start_ts'), // Unix seconds, first asleep record
+  sleepEndTs: integer('sleep_end_ts'), // Unix seconds, last asleep record
   qualityScore: real('quality_score').notNull(),
   totalMin: real('total_min').notNull(),
   deepPct: real('deep_pct').notNull(),

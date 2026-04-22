@@ -7,7 +7,9 @@ export type Night = {
 
 export type SleepSession = {
   date: string
-  totalMin: number // Minutes asleep (Core + Deep + REM + legacy "Asleep")
+  sleepStartTs: number | null // Unix seconds, first asleep record
+  sleepEndTs: number | null // Unix seconds, last asleep record
+  totalMin: number // Minutes asleep (Core + Deep + REM + Unspecified + legacy "Asleep")
   deepPct: number // Deep / total asleep
   remPct: number // REM / total asleep
   hrvAvg: number | null
@@ -68,8 +70,16 @@ export function groupIntoNights(records: HealthRecord[]): Night[] {
   })
 }
 
-// Stages that count toward total sleep duration
-const ASLEEP_STAGES = new Set(['AsleepCore', 'AsleepDeep', 'AsleepREM', 'Asleep'])
+// Stages that count toward total sleep duration. AsleepUnspecified covers
+// older Apple Watches and low-power mode where stage detection isn't
+// available but the user is still asleep.
+const ASLEEP_STAGES = new Set([
+  'AsleepCore',
+  'AsleepDeep',
+  'AsleepREM',
+  'AsleepUnspecified',
+  'Asleep',
+])
 
 export function computeSleepSession(night: Night, allHrvRecords: HealthRecord[]): SleepSession {
   let totalMin = 0
@@ -79,6 +89,8 @@ export function computeSleepSession(night: Night, allHrvRecords: HealthRecord[])
 
   let sessionStart = Infinity
   let sessionEnd = -Infinity
+  let asleepStart = Infinity // Distinct from sessionStart — excludes InBed-only prelude
+  let asleepEnd = -Infinity
 
   for (const rec of night.stageRecords) {
     const stage = stageOf(rec)
@@ -89,6 +101,8 @@ export function computeSleepSession(night: Night, allHrvRecords: HealthRecord[])
       totalMin += mins
       sessionStart = Math.min(sessionStart, rec.startTs)
       sessionEnd = Math.max(sessionEnd, rec.endTs)
+      asleepStart = Math.min(asleepStart, rec.startTs)
+      asleepEnd = Math.max(asleepEnd, rec.endTs)
       if (stage === 'AsleepDeep') deepMin += mins
       else if (stage === 'AsleepREM') remMin += mins
     } else if (stage === 'InBed') {
@@ -128,6 +142,8 @@ export function computeSleepSession(night: Night, allHrvRecords: HealthRecord[])
 
   return {
     date: night.date,
+    sleepStartTs: asleepStart === Infinity ? null : Math.floor(asleepStart),
+    sleepEndTs: asleepEnd === -Infinity ? null : Math.floor(asleepEnd),
     totalMin,
     deepPct,
     remPct,
