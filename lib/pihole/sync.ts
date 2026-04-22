@@ -12,11 +12,11 @@ const PiholeQuerySchema = z.object({
   domain: z.string(),
   client: z.object({
     ip: z.string(),
-    name: z.string().optional(),
+    name: z.string().nullish(),
   }),
   // status is an integer code in v6 (2=forwarded, 3=cached, 1=blocked-gravity, etc.)
   status: z.union([z.string(), z.number()]).transform(String),
-  type: z.union([z.string(), z.number()]).optional(),
+  type: z.union([z.string(), z.number()]).nullish(),
 })
 
 const PiholeQueriesResponseSchema = z.object({
