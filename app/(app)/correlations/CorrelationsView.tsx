@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CorrelationMatrix } from '@/components/charts/CorrelationMatrix'
 import { CorrelationScatter } from '@/components/charts/CorrelationScatter'
+import { Recommendations } from './Recommendations'
 
 type Props = { snapshot: CorrelationSnapshot }
 
@@ -80,6 +81,8 @@ export function CorrelationsView({ snapshot }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {!insufficient && <Recommendations results={snapshot.results} />}
     </div>
   )
 }
