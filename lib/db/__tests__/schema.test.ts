@@ -49,7 +49,7 @@ describe('database schema', () => {
         type: 'HKCategoryTypeIdentifierSleepAnalysis',
         startTs: 1705276800,
         endTs: 1705280400,
-        value: 5, // AsleepDeep
+        value: 'AsleepDeep',
         unit: null,
         source: 'Apple Watch',
       })

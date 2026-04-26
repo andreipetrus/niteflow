@@ -5,6 +5,7 @@ import { PiholeSettingsForm } from './PiholeSettingsForm'
 import { DeviceSelector } from './DeviceSelector'
 import { DnsQueriesView } from './DnsQueriesView'
 import { TaxonomyPicker } from './TaxonomyPicker'
+import { DomainOverridesView } from './DomainOverridesView'
 
 export default async function SettingsPage() {
   const saved = await loadPiholeSettings()
@@ -24,6 +25,7 @@ export default async function SettingsPage() {
         packAvailable={pack.available}
         packSize={pack.domainCount}
       />
+      <DomainOverridesView />
     </div>
   )
 }

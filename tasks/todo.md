@@ -33,5 +33,5 @@
 
 ## Phase E · Polish
 
-- [ ] **T13** · User domain override UI
+- [x] **T13** · User domain override UI
 - [ ] ~~**T14**~~ · Pi-hole list name inference — superseded by Curlie (T04+T05)
